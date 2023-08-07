@@ -10,7 +10,6 @@ const app = express();
 app.use(morgan("dev"));
 app.use(bodyParser.json());
 dotenv.config();
-console.log(process.env.DB_HOST, "cjsu");
 
 app.use(identifyRouter);
 
