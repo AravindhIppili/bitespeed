@@ -4,8 +4,7 @@
     "description": "",
     "main": "src/index.js",
     "scripts": {
-        "build": "rimraf dist && npx tsc --watch",
-        "start": "concurrently  \"npx build\" \"nodemon -q dist/index.js\""
+        "start": "concurrently \"tsc\" \"nodemon -q dist/index.js\""
     },
     "keywords": [],
     "author": "",

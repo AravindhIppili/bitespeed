@@ -11,6 +11,9 @@ app.use(morgan("dev"));
 app.use(bodyParser.json());
 dotenv.config();
 
+app.get("/", (req, res) => {
+    return res.send("Health test!!!");
+});
 app.use(identifyRouter);
 
 const PORT = 8000;
