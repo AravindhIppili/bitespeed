@@ -1,63 +1,56 @@
 import { Request, Response, Router } from "express";
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
-
+import Contact from "../models/contact";
+import Sequelize from "sequelize";
 const router = Router();
 
-router.post("/identify", async (req: Request, res: Response) => {
-    const { email, phoneNumber } = req.body;
-
-    if (!email && !phoneNumber) {
-        return res.status(400).json({ error: "Either email or phoneNumber must be provided." });
-    }
+router.post("/identify", async (req, res) => {
+    const { email = "", phoneNumber = "" } = req.body;
 
     try {
-        const primaryContact = await prisma.contact.findFirst({
+        const primaryContact = await Contact.findOne({
             where: {
-                OR: [{ email }, { phoneNumber }],
+                [Sequelize.Op.or]: [{ email }, { phoneNumber }],
                 linkPrecedence: "primary",
             },
         });
 
         if (!primaryContact) {
-            const newPrimaryContact = await prisma.contact.create({
-                data: {
-                    email,
-                    phoneNumber,
-                    linkPrecedence: "primary",
-                },
+            // Create a new primary contact if not found
+            const newPrimary = await Contact.create({
+                phoneNumber,
+                email,
+                linkPrecedence: "primary",
             });
 
             return res.status(200).json({
                 contact: {
-                    primaryContatctId: newPrimaryContact.id,
-                    emails: [newPrimaryContact.email],
-                    phoneNumbers: [newPrimaryContact.phoneNumber],
+                    primaryContactId: newPrimary.id,
+                    emails: [newPrimary.email],
+                    phoneNumbers: [newPrimary.phoneNumber],
                     secondaryContactIds: [],
                 },
             });
         }
 
-        const secondaryContacts = await prisma.contact.findMany({
-            where: {
-                linkedId: primaryContact.id,
-                linkPrecedence: "secondary",
-            },
+        // Create a new secondary contact
+        const secondaryContact = await Contact.create({
+            phoneNumber,
+            email,
+            linkedId: primaryContact.id,
+            linkPrecedence: "secondary",
         });
 
         return res.status(200).json({
             contact: {
-                primaryContatctId: primaryContact.id,
-                emails: [primaryContact.email, ...secondaryContacts.map((contact) => contact.email)],
-                phoneNumbers: [primaryContact.phoneNumber, ...secondaryContacts.map((contact) => contact.phoneNumber)],
-                secondaryContactIds: secondaryContacts.map((contact) => contact.id),
+                primaryContactId: primaryContact.id,
+                emails: [primaryContact.email, secondaryContact.email],
+                phoneNumbers: [primaryContact.phoneNumber, secondaryContact.phoneNumber],
+                secondaryContactIds: [secondaryContact.id],
             },
         });
     } catch (error) {
-        console.error("Error:", error);
-        return res.status(500).json({ error: "Internal Server Error" });
+        console.error("Error identifying contact:", error);
+        res.status(500).json({ error: "Internal server error" });
     }
 });
-
 export default router;
