@@ -4,7 +4,11 @@ import Sequelize from "sequelize";
 const router = Router();
 
 router.post("/identify", async (req, res) => {
-    const { email = "", phoneNumber = "" } = req.body;
+    const { email, phoneNumber } = req.body;
+
+    if (!email && !phoneNumber) {
+        return res.status(400).json({ error: "Both email and phoneNumber are missing" });
+    }
 
     try {
         const primaryContact = await Contact.findOne({
@@ -32,20 +36,35 @@ router.post("/identify", async (req, res) => {
             });
         }
 
-        // Create a new secondary contact
-        const secondaryContact = await Contact.create({
-            phoneNumber,
-            email,
-            linkedId: primaryContact.id,
-            linkPrecedence: "secondary",
-        });
+        // Create a new secondary contact if the email is different from primary contact's email
+        let secondaryEmails: string[] = [];
+        if (primaryContact.email !== email) {
+            secondaryEmails = [email];
 
+            const secondaryContact = await Contact.create({
+                phoneNumber,
+                email,
+                linkedId: primaryContact.id,
+                linkPrecedence: "secondary",
+            });
+
+            return res.status(200).json({
+                contact: {
+                    primaryContactId: primaryContact.id,
+                    emails: [primaryContact.email, secondaryContact.email],
+                    phoneNumbers: [primaryContact.phoneNumber, secondaryContact.phoneNumber],
+                    secondaryContactIds: [secondaryContact.id],
+                },
+            });
+        }
+
+        // If the same email exists in primary, return the primary contact details
         return res.status(200).json({
             contact: {
                 primaryContactId: primaryContact.id,
-                emails: [primaryContact.email, secondaryContact.email],
-                phoneNumbers: [primaryContact.phoneNumber, secondaryContact.phoneNumber],
-                secondaryContactIds: [secondaryContact.id],
+                emails: [primaryContact.email],
+                phoneNumbers: [primaryContact.phoneNumber],
+                secondaryContactIds: [],
             },
         });
     } catch (error) {
@@ -53,4 +72,5 @@ router.post("/identify", async (req, res) => {
         res.status(500).json({ error: "Internal server error" });
     }
 });
+
 export default router;
